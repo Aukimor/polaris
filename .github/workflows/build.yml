@@ -1,0 +1,57 @@
+name: Build Polaris Kernel
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'arch/arm64/configs/polaris_aukimor_defconfig'
+      - 'anykernel.sh'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          repository: Aukimor/polaris
+          ref: polaris-o-oss
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential bc bison flex libncurses5-dev libssl-dev libelf-dev zip
+
+      - name: Download toolchain
+        run: |
+          git clone --depth=1 -b lineage-18.1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
+          git clone --depth=1 -b lineage-18.1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
+
+      - name: Build kernel
+        run: |
+          export PATH=$PWD/gcc64/bin:$PWD/gcc32/bin:$PATH
+          make ARCH=arm64 O=out polaris_aukimor_defconfig
+          make ARCH=arm64 O=out -j"$(nproc)" \
+            HOSTCFLAGS="-fcommon -O2" \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=arm-linux-androideabi-
+          ls -la out/arch/arm64/boot/
+
+      - name: Package AnyKernel3
+        run: |
+          curl -sL https://github.com/osm0sis/AnyKernel3/archive/refs/heads/master.tar.gz -o ak3.tar.gz
+          tar xzf ak3.tar.gz
+          mv AnyKernel3-master AnyKernel3
+          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+          cp anykernel.sh AnyKernel3/anykernel.sh
+          cd AnyKernel3
+          zip -r ../ak3-flasher.zip . -x '.git*'
+          cd ..
+          ls -la ak3-flasher.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnyKernel3-flasher
+          path: ak3-flasher.zip
