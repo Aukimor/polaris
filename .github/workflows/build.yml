@@ -31,11 +31,20 @@ jobs:
       - name: Build kernel
         run: |
           export PATH=$PWD/gcc64/bin:$PWD/gcc32/bin:$PATH
-          make ARCH=arm64 O=out polaris_aukimor_defconfig
+          make ARCH=arm64 O=out \
+            CC=$PWD/gcc64/bin/aarch64-linux-android-gcc \
+            HOSTCC=gcc \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            polaris_aukimor_defconfig
           make ARCH=arm64 O=out -j"$(nproc)" \
+            CC=$PWD/gcc64/bin/aarch64-linux-android-gcc \
+            HOSTCC=gcc \
             HOSTCFLAGS="-fcommon -O2" \
             CROSS_COMPILE=aarch64-linux-android- \
-            CROSS_COMPILE_ARM32=arm-linux-androideabi-
+            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu-
           ls -la out/arch/arm64/boot/
 
       - name: Package AnyKernel3
